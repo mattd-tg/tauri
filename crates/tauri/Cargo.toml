@@ -27,6 +27,7 @@ features = [
   "specta",
   "dynamic-acl",
   "isolation",
+  "linux-ksni",
 ]
 default-target = "x86_64-unknown-linux-gnu"
 targets = [
@@ -91,9 +92,12 @@ muda = { version = "0.19", default-features = false, features = [
   "serde",
   "gtk",
 ] }
+# NO `gtk` here, deliberately. Upstream enables it because tray-icon 0.24 moved
+# libappindicator behind that feature and upstream still wants it; this fork
+# replaces that backend with StatusNotifierItem, which the `linux-ksni` feature
+# below forwards. Enabling both compiles two tray backends into one binary.
 tray-icon = { version = "0.24", default-features = false, features = [
   "serde",
-  "gtk",
 ], optional = true }
 
 # linux
@@ -233,6 +237,7 @@ image-png = ["image/png"]
 macos-proxy = ["tauri-runtime-wry?/macos-proxy"]
 dynamic-acl = []
 specta = ["dep:specta"]
+linux-ksni = ["tray-icon?/linux-ksni"]
 
 [[example]]
 name = "commands"
