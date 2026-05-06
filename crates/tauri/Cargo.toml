@@ -88,9 +88,10 @@ muda = { version = "0.20", default-features = false, features = [
   "serde",
   "gtk3",
 ] }
+# Deliberately omit `libappindicator`: enabling it with the StatusNotifierItem backend
+# selected by `linux-ksni` would compile both Linux tray backends.
 tray-icon = { version = "0.25", default-features = false, features = [
   "serde",
-  "libappindicator",
 ], optional = true }
 
 # linux
@@ -201,6 +202,7 @@ common-controls-v6 = [
   "tauri-runtime-wry?/common-controls-v6",
 ]
 tray-icon = ["dep:tray-icon"]
+linux-ksni = ["tray-icon/ksni"]
 tracing = ["dep:tracing", "tauri-macros/tracing", "tauri-runtime-wry?/tracing"]
 test = []
 compression = ["tauri-macros/compression", "tauri-utils/compression"]
