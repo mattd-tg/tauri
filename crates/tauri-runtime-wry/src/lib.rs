@@ -5225,23 +5225,18 @@ You may have it installed on another user account, but it is not available for t
   }
 
   let webview = match kind {
-    #[cfg(not(any(
-      target_os = "windows",
-      target_os = "macos",
-      target_os = "ios",
-      target_os = "android"
-    )))]
-    WebviewKind::WindowChild => {
-      // only way to account for menu bar height, and also works for multiwebviews :)
-      let vbox = window.default_vbox().unwrap();
-      webview_builder.build_gtk(vbox)
-    }
-    #[cfg(any(
-      target_os = "windows",
-      target_os = "macos",
-      target_os = "ios",
-      target_os = "android"
-    ))]
+    // SPIKE: Linux joins `build_as_child` instead of `build_gtk(default_vbox)`.
+    //
+    // A child webview packed into the toplevel's `GtkBox` cannot be positioned:
+    // wry's `set_bounds` has an x11 branch and a fixed-parent branch, and a
+    // GtkBox child satisfies neither, so it silently does nothing. Worse, a
+    // webview laid out at a negative origin inside a `GtkFixed` is allocated
+    // correctly but never painted by WebKitGTK. `build_as_child` gives a real
+    // X11 child window instead, where the clipping is done by the X server and
+    // a negative origin never reaches WebKit's painter.
+    //
+    // The vbox is still the right container for `WindowContent`, which fills the
+    // window and has to sit below the menu bar; that arm is untouched.
     WebviewKind::WindowChild => webview_builder.build_as_child(&window),
     WebviewKind::WindowContent => {
       #[cfg(any(
