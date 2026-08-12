@@ -198,7 +198,25 @@ default = [
   "x11",
   "dbus",
 ]
-unstable = ["tauri-runtime-wry?/unstable"]
+# The forward to `tauri-runtime-wry` is severed on purpose, so this feature
+# unlocks the multiwebview API and nothing else.
+#
+# Upstream's `unstable` does two unrelated jobs. In this crate it is a
+# visibility switch: `WindowBuilder`/`WebviewBuilder` become `pub` instead of
+# `pub(crate)` and `Window::add_child` is compiled in. In `tauri-runtime-wry`
+# it is a behavior switch, and that half is what this drops — there, a window's
+# INITIAL webview becomes `WebviewKind::WindowChild` with explicit bounds and
+# rate-based auto-resize on every `Resized`, instead of `WindowContent` left to
+# wry's fill-parent path. That also skips `undecorated_resizing`'s resize
+# handler and routes drag-drop as a webview event rather than a synthesized
+# window one.
+#
+# Downstream wants the API for one window it builds by hand and does not want
+# the default changed under every ordinary `WebviewWindow`. `add_child` does
+# not need the runtime half: both of its paths hard-code
+# `WebviewKind::WindowChild` already, and `tauri-runtime` gates nothing on this
+# feature at all.
+unstable = []
 x11 = ["tauri-runtime-wry?/x11"]
 dbus = ["tauri-runtime-wry?/dbus"]
 common-controls-v6 = [
