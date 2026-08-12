@@ -5426,6 +5426,52 @@ fn to_tao_theme(theme: Option<Theme>) -> Option<TaoTheme> {
   }
 }
 
+/// Whether the keyboard is still somewhere inside this webview's own window.
+///
+/// WebView2 raises `LostFocus` whenever the webview stops holding the keyboard,
+/// and that includes the keyboard moving to the webview's OWN top-level window.
+/// Every `SetWindowPos` that moves or resizes the webview does exactly that, so a
+/// window which repositions itself while it is open -- a panel that sizes itself
+/// to its content, for instance -- raises one `LostFocus` per frame it applies.
+/// Reported as window blurs, those are departures the user never made: measured
+/// at one blur per move, 1ms after the move, on every show.
+///
+/// `GetFocus` is the right call here and is wrong almost everywhere else. It
+/// answers about the CALLING THREAD's message queue, and a WebView2 event handler
+/// runs on the thread that owns the controller -- so here it is being asked by the
+/// one thread that can answer it. It is also correctly TIMED: `LostFocus` is
+/// raised after the focus change has happened, unlike `WM_KILLFOCUS`, where the
+/// activation change is still in flight and no synchronous read of who holds the
+/// keyboard can be trusted.
+///
+/// A null answer is not "unknown", it is the real departure: our thread holds no
+/// focus at all, which is what this event exists to report.
+#[cfg(windows)]
+fn focus_stayed_in_window(controller: &ICoreWebView2Controller) -> bool {
+  use windows::Win32::UI::Input::KeyboardAndMouse::GetFocus;
+  use windows::Win32::UI::WindowsAndMessaging::{GetAncestor, GA_ROOT};
+
+  let mut container = HWND::default();
+
+  // SAFETY: plain Win32 reads, made on the thread that owns both windows.
+  unsafe {
+    if controller.ParentWindow(&mut container).is_err() || container.0.is_null() {
+      return false;
+    }
+
+    let focused = GetFocus();
+
+    if focused.0.is_null() {
+      return false;
+    }
+
+    // Rooted, because the focus may be on any descendant of our top level and the
+    // container is itself a child. Comparing the two roots is what separates "the
+    // keyboard is still ours" from "another window has it".
+    GetAncestor(focused, GA_ROOT) == GetAncestor(container, GA_ROOT)
+  }
+}
+
 /// Used to prevent duplicated [`WindowEvent::Focused`] events,
 /// and to track last focused webview in multi-webview mode for us to restore webview focuses
 #[cfg(windows)]
@@ -5474,7 +5520,18 @@ fn add_focus_change_listeners<T: UserEvent>(
 
   if let Err(error) = unsafe {
     controller.add_LostFocus(
-      &FocusChangedEventHandler::create(Box::new(move |_, _| {
+      &FocusChangedEventHandler::create(Box::new(move |sender, _| {
+        // A window that repositions itself while open raises one LostFocus per
+        // move, and a move is not a departure -- see `focus_stayed_in_window`.
+        //
+        // Returning before the state machine on purpose: the webview really did
+        // stop holding the keyboard, but it is about to get it back, and
+        // recording that as `Blured` would both emit a blur nobody caused and
+        // leave the next focus gain looking like a fresh activation.
+        if sender.as_ref().is_some_and(focus_stayed_in_window) {
+          return Ok(());
+        }
+
         let mut focused_webview = focused_webview.lock().unwrap();
         // when using multiwebview mode, we should handle webview focus changes
         // so we check is the currently focused webview matches this webview's
