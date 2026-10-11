@@ -84,13 +84,13 @@ cookie = "0.18"
 
 # desktop
 [target.'cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd", target_os = "windows", target_os = "macos"))'.dependencies]
-muda = { version = "0.20", default-features = false, features = [
+muda = { version = "0.21", default-features = false, features = [
   "serde",
   "gtk3",
 ] }
 # Deliberately omit `libappindicator`: enabling it with the StatusNotifierItem backend
 # selected by `linux-ksni` would compile both Linux tray backends.
-tray-icon = { version = "0.25", default-features = false, features = [
+tray-icon = { version = "0.26", default-features = false, features = [
   "serde",
 ], optional = true }
 
